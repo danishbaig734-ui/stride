@@ -1,0 +1,6 @@
+{
+  "name": "Stride Mod",
+  "description": "A daily step tracker with movement streaks, goals, achievements, and health sync.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

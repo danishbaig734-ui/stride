@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Stride</string>
+    <string name="app_name">Stride Mod</string>
     <string name="share_card_title">Share your stride</string>
     <string name="notif_channel_goal">Goal celebrations</string>
     <string name="notif_channel_nudge">Movement nudges</string>

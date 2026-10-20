@@ -235,7 +235,7 @@ object ShareCardRenderer {
     }
 
     fun shareIntent(context: Context, file: File): Intent {
-        val uri = FileProvider.getUriForFile(context, "com.vythera.stride.fileprovider", file)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         return Intent.createChooser(
             Intent(Intent.ACTION_SEND).apply {
                 type = "image/png"
