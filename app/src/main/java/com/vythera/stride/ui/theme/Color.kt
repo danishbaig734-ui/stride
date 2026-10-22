@@ -275,3 +275,72 @@ val StridePalettes: List<StridePalette> = listOf(
 )
 
 fun paletteById(id: String): StridePalette = StridePalettes.firstOrNull { it.id == id } ?: StridePalettes.first()
+
+// Retro theme colors (Cyan primary accent, dark background)
+val RetroCyan = Color(0xFF00E5FF)
+val RetroBackground = Color(0xFF0A0E14)
+val RetroColorScheme = darkColorScheme(
+    primary = Color(0xFF00E5FF),
+    onPrimary = Color(0xFF00363D),
+    primaryContainer = Color(0xFF004E57),
+    onPrimaryContainer = Color(0xFF80F2FF),
+    secondary = Color(0xFF80DEEA),
+    onSecondary = Color(0xFF00363D),
+    secondaryContainer = Color(0xFF004E57),
+    onSecondaryContainer = Color(0xFFB2EBF2),
+    tertiary = Color(0xFFFF4081),
+    onTertiary = Color(0xFF5C0024),
+    tertiaryContainer = Color(0xFF800033),
+    onTertiaryContainer = Color(0xFFFFB2C9),
+    background = Color(0xFF0A0E14),
+    onBackground = Color(0xFFE1E8ED),
+    surface = Color(0xFF0A0E14),
+    onSurface = Color(0xFFE1E8ED),
+    surfaceVariant = Color(0xFF233240),
+    onSurfaceVariant = Color(0xFF90A4AE),
+    surfaceContainerLowest = Color(0xFF06090D),
+    surfaceContainerLow = Color(0xFF0F151C),
+    surfaceContainer = Color(0xFF151D27),
+    surfaceContainerHigh = Color(0xFF1C2734),
+    surfaceContainerHighest = Color(0xFF243242),
+    outline = Color(0xFF455A64),
+    outlineVariant = Color(0xFF263238),
+    inverseSurface = Color(0xFFE1E8ED),
+    inverseOnSurface = Color(0xFF0A0E14),
+    inversePrimary = Color(0xFF0097A7)
+)
+
+// Verdant theme colors (Lime Green primary accent, dark background)
+val VerdantLime = Color(0xFFB2FF59)
+val VerdantBackground = Color(0xFF0C140C)
+val VerdantColorScheme = darkColorScheme(
+    primary = Color(0xFFB2FF59),
+    onPrimary = Color(0xFF1B3700),
+    primaryContainer = Color(0xFF2B5200),
+    onPrimaryContainer = Color(0xFFCCFF90),
+    secondary = Color(0xFFC8E6C9),
+    onSecondary = Color(0xFF1B3700),
+    secondaryContainer = Color(0xFF2E4C2E),
+    onSecondaryContainer = Color(0xFFE8F5E9),
+    tertiary = Color(0xFFFFD54F),
+    onTertiary = Color(0xFF402D00),
+    tertiaryContainer = Color(0xFF5C4100),
+    onTertiaryContainer = Color(0xFFFFECB3),
+    background = Color(0xFF0C140C),
+    onBackground = Color(0xFFE2EBE2),
+    surface = Color(0xFF0C140C),
+    onSurface = Color(0xFFE2EBE2),
+    surfaceVariant = Color(0xFF253325),
+    onSurfaceVariant = Color(0xFF819981),
+    surfaceContainerLowest = Color(0xFF070B07),
+    surfaceContainerLow = Color(0xFF101910),
+    surfaceContainer = Color(0xFF152215),
+    surfaceContainerHigh = Color(0xFF1D2E1D),
+    surfaceContainerHighest = Color(0xFF263A26),
+    outline = Color(0xFF4C664C),
+    outlineVariant = Color(0xFF2E3D2E),
+    inverseSurface = Color(0xFFE2EBE2),
+    inverseOnSurface = Color(0xFF0C140C),
+    inversePrimary = Color(0xFF64DD17)
+)
+

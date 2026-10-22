@@ -3,6 +3,7 @@ package com.vythera.stride.data.prefs
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -12,6 +13,7 @@ import com.vythera.stride.model.ColorStyle
 import com.vythera.stride.model.StepSource
 import com.vythera.stride.model.StridePrefs
 import com.vythera.stride.model.ThemeMode
+import com.vythera.stride.model.ThemeStyle
 import com.vythera.stride.model.UnitSystem
 import com.vythera.stride.model.UpdateFrequency
 import kotlinx.coroutines.flow.Flow
@@ -33,6 +35,11 @@ class UserPreferences(private val context: Context) {
         val themeMode = stringPreferencesKey("theme_mode")
         val dynamicColor = booleanPreferencesKey("dynamic_color")
         val paletteId = stringPreferencesKey("palette_id")
+        val themeStyle = stringPreferencesKey("theme_style")
+        val liquidGlass = booleanPreferencesKey("liquid_glass")
+        val navBarBlur = floatPreferencesKey("nav_bar_blur")
+        val navBarEdgeLight = floatPreferencesKey("nav_bar_edge_light")
+        val navBarRefraction = floatPreferencesKey("nav_bar_refraction")
         val notifGoal = booleanPreferencesKey("notif_goal")
         val notifNudge = booleanPreferencesKey("notif_nudge")
         val amoled = booleanPreferencesKey("amoled")
@@ -70,6 +77,11 @@ class UserPreferences(private val context: Context) {
             themeMode = runCatching { ThemeMode.valueOf(p[Keys.themeMode] ?: "SYSTEM") }.getOrDefault(ThemeMode.SYSTEM),
             dynamicColor = p[Keys.dynamicColor] ?: false,
             paletteId = p[Keys.paletteId] ?: "tide",
+            themeStyle = runCatching { ThemeStyle.valueOf(p[Keys.themeStyle] ?: "CLASSIC") }.getOrDefault(ThemeStyle.CLASSIC),
+            liquidGlass = p[Keys.liquidGlass] ?: false,
+            navBarBlurDp = p[Keys.navBarBlur] ?: 10f,
+            navBarEdgeLight = p[Keys.navBarEdgeLight] ?: 0.5f,
+            navBarRefraction = p[Keys.navBarRefraction] ?: 1.0f,
             notifGoal = p[Keys.notifGoal] ?: true,
             notifNudge = p[Keys.notifNudge] ?: true,
             amoled = p[Keys.amoled] ?: false,
@@ -99,6 +111,16 @@ class UserPreferences(private val context: Context) {
     suspend fun setThemeMode(mode: ThemeMode) = context.dataStore.edit { it[Keys.themeMode] = mode.name }
     suspend fun setDynamicColor(enabled: Boolean) = context.dataStore.edit { it[Keys.dynamicColor] = enabled }
     suspend fun setPaletteId(id: String) = context.dataStore.edit { it[Keys.paletteId] = id }
+    suspend fun setThemeStyle(style: ThemeStyle) = context.dataStore.edit { it[Keys.themeStyle] = style.name }
+    suspend fun setLiquidGlass(enabled: Boolean) = context.dataStore.edit { it[Keys.liquidGlass] = enabled }
+    suspend fun setNavBarBlur(blur: Float) = context.dataStore.edit { it[Keys.navBarBlur] = blur.coerceIn(0f, 25f) }
+    suspend fun setNavBarEdgeLight(edge: Float) = context.dataStore.edit { it[Keys.navBarEdgeLight] = edge.coerceIn(0f, 1f) }
+    suspend fun setNavBarRefraction(ref: Float) = context.dataStore.edit { it[Keys.navBarRefraction] = ref.coerceIn(1f, 2f) }
+    suspend fun resetNavBarGlass() = context.dataStore.edit {
+        it[Keys.navBarBlur] = 10f
+        it[Keys.navBarEdgeLight] = 0.5f
+        it[Keys.navBarRefraction] = 1.0f
+    }
     suspend fun setNotifGoal(enabled: Boolean) = context.dataStore.edit { it[Keys.notifGoal] = enabled }
     suspend fun setNotifNudge(enabled: Boolean) = context.dataStore.edit { it[Keys.notifNudge] = enabled }
     suspend fun setAmoled(enabled: Boolean) = context.dataStore.edit { it[Keys.amoled] = enabled }

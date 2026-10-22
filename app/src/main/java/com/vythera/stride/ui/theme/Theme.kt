@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import com.vythera.stride.model.StridePrefs
 import com.vythera.stride.model.ThemeMode
+import com.vythera.stride.model.ThemeStyle
 
 /** Zenith-style remap: tinted window background, popping cards. */
 private fun ColorScheme.expressiveSurfaces(dark: Boolean): ColorScheme =
@@ -43,25 +44,38 @@ fun StrideTheme(
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
     }
 
-    val base = if (prefs.dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        val context = LocalContext.current
-        val dyn = if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        dyn.expressiveSurfaces(darkTheme)
-    } else {
-        val palette = paletteById(prefs.paletteId)
-        if (darkTheme) palette.dark else palette.light
+    val effectiveDark = darkTheme || prefs.themeStyle != ThemeStyle.CLASSIC
+
+    val base = when (prefs.themeStyle) {
+        ThemeStyle.RETRO -> RetroColorScheme
+        ThemeStyle.VERDANT -> VerdantColorScheme
+        ThemeStyle.CLASSIC -> {
+            if (prefs.dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val context = LocalContext.current
+                val dyn = if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+                dyn.expressiveSurfaces(darkTheme)
+            } else {
+                val palette = paletteById(prefs.paletteId)
+                if (darkTheme) palette.dark else palette.light
+            }
+        }
     }
-    val colorScheme = base
-        .applyStyle(prefs.colorStyle)
-        .let { if (prefs.amoled && darkTheme) it.applyAmoled() else it }
+
+    val colorScheme = if (prefs.themeStyle == ThemeStyle.CLASSIC) {
+        base
+            .applyStyle(prefs.colorStyle)
+            .let { if (prefs.amoled && darkTheme) it.applyAmoled() else it }
+    } else {
+        if (prefs.amoled) base.applyAmoled() else base
+    }
 
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val activity = view.context as? Activity ?: return@SideEffect
             val controller = WindowCompat.getInsetsController(activity.window, view)
-            controller.isAppearanceLightStatusBars = !darkTheme
-            controller.isAppearanceLightNavigationBars = !darkTheme
+            controller.isAppearanceLightStatusBars = !effectiveDark
+            controller.isAppearanceLightNavigationBars = !effectiveDark
         }
     }
 

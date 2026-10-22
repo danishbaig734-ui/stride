@@ -3,6 +3,7 @@ package com.vythera.stride.data.repo
 import com.vythera.stride.data.db.AchievementEntity
 import com.vythera.stride.data.db.DailySummaryEntity
 import com.vythera.stride.data.db.StrideDatabase
+import com.vythera.stride.data.db.WalkSessionEntity
 import com.vythera.stride.data.health.HealthConnectManager
 import com.vythera.stride.data.health.HealthExporter
 import com.vythera.stride.data.health.StepSensorManager
@@ -11,12 +12,15 @@ import com.vythera.stride.domain.AchievementDef
 import com.vythera.stride.domain.Achievements
 import com.vythera.stride.domain.StreakInfo
 import com.vythera.stride.domain.Streaks
+import com.vythera.stride.model.ActiveWalk
 import com.vythera.stride.model.DailyStats
 import com.vythera.stride.model.StatSource
 import com.vythera.stride.notifications.Notifier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.sync.Mutex
@@ -69,6 +73,42 @@ class StepRepository(
         db.summaryDao().observeRange(from.toEpochDay(), to.toEpochDay())
 
     fun observeAchievements(): Flow<List<AchievementEntity>> = db.achievementDao().observeAll()
+
+    private val _activeWalk = MutableStateFlow<ActiveWalk?>(null)
+    val activeWalk: kotlinx.coroutines.flow.StateFlow<ActiveWalk?> = _activeWalk.asStateFlow()
+
+    fun startWalk(currentSteps: Long) {
+        _activeWalk.value = ActiveWalk(
+            startTimeMillis = System.currentTimeMillis(),
+            startSteps = currentSteps
+        )
+    }
+
+    suspend fun stopWalk(currentSteps: Long, strideMeters: Double): WalkSessionEntity? {
+        val walk = _activeWalk.value ?: return null
+        val endTime = System.currentTimeMillis()
+        val sessionSteps = (currentSteps - walk.startSteps).coerceAtLeast(0L)
+        val distance = sessionSteps * strideMeters
+        val entity = WalkSessionEntity(
+            startTimeMillis = walk.startTimeMillis,
+            endTimeMillis = endTime,
+            steps = sessionSteps,
+            distanceMeters = distance
+        )
+        db.walkSessionDao().insert(entity)
+        _activeWalk.value = null
+        return entity
+    }
+
+    fun cancelWalk() {
+        _activeWalk.value = null
+    }
+
+    fun observeWalkSessions(): Flow<List<WalkSessionEntity>> =
+        db.walkSessionDao().observeAll()
+
+    suspend fun deleteWalkSession(id: Long) =
+        db.walkSessionDao().delete(id)
 
     suspend fun hcGranted(): Boolean = hc.hasAllPermissions()
 

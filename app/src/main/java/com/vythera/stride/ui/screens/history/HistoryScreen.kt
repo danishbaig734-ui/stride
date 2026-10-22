@@ -38,6 +38,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.DirectionsWalk
+import androidx.compose.material.icons.rounded.Route
+import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import com.vythera.stride.data.db.WalkSessionEntity
+import com.vythera.stride.model.UnitSystem
+import kotlinx.coroutines.launch
 import com.vythera.stride.R
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -73,12 +86,22 @@ class HistoryViewModel : ViewModel() {
         Graph.prefs.prefs
     ) { summaries, prefs -> HistoryData(summaries, prefs) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HistoryData())
+
+    val walkSessions: StateFlow<List<WalkSessionEntity>> = repo.observeWalkSessions()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun deleteSession(id: Long) {
+        viewModelScope.launch {
+            repo.deleteWalkSession(id)
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun HistoryScreen(viewModel: HistoryViewModel = viewModel()) {
     val data by viewModel.data.collectAsStateWithLifecycle()
+    val walkSessions by viewModel.walkSessions.collectAsStateWithLifecycle()
     var monthMode by rememberSaveable { mutableStateOf(false) }
     var weekOffset by rememberSaveable { mutableStateOf(0) }
     var month by remember { mutableStateOf(YearMonth.now()) }
@@ -160,6 +183,13 @@ fun HistoryScreen(viewModel: HistoryViewModel = viewModel()) {
         TotalsCard(
             byDay = byDay, monthMode = monthMode, month = month, weekOffset = weekOffset,
             modifier = Modifier.entrance(4)
+        )
+
+        WalkSessionsSection(
+            sessions = walkSessions,
+            unit = data.prefs.unit,
+            onDelete = { viewModel.deleteSession(it) },
+            modifier = Modifier.entrance(5)
         )
 
         Spacer(Modifier.height(120.dp))
@@ -354,4 +384,224 @@ private fun TotalStat(label: String, value: String) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
+}
+
+@Composable
+private fun WalkSessionsSection(
+    sessions: List<WalkSessionEntity>,
+    unit: UnitSystem,
+    onDelete: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.DirectionsWalk,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = stringResource(R.string.walk_sessions),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
+
+            if (sessions.isNotEmpty()) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Text(
+                        text = "${sessions.size}",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        }
+
+        if (sessions.isEmpty()) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.DirectionsWalk,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.size(36.dp)
+                    )
+                    Text(
+                        text = stringResource(R.string.no_walk_sessions),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = stringResource(R.string.walk_sessions_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
+            }
+        } else {
+            sessions.forEach { session ->
+                WalkSessionCard(
+                    session = session,
+                    unit = unit,
+                    onDelete = { onDelete(session.id) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WalkSessionCard(
+    session: WalkSessionEntity,
+    unit: UnitSystem,
+    onDelete: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("walk_session_card_${session.id}")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = formatSessionDate(session.startTimeMillis),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .testTag("delete_walk_session_${session.id}")
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.DeleteOutline,
+                        contentDescription = stringResource(R.string.delete_session),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                WalkCardStat(
+                    icon = Icons.Rounded.DirectionsWalk,
+                    value = Formatters.steps(session.steps),
+                    label = stringResource(R.string.session_steps),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                WalkCardStat(
+                    icon = Icons.Rounded.Timer,
+                    value = formatSessionDuration(session.durationMillis),
+                    label = stringResource(R.string.session_duration),
+                    tint = MaterialTheme.colorScheme.secondary
+                )
+                WalkCardStat(
+                    icon = Icons.Rounded.Route,
+                    value = Formatters.distance(session.distanceMeters, unit),
+                    label = stringResource(R.string.session_distance),
+                    tint = MaterialTheme.colorScheme.tertiary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WalkCardStat(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    value: String,
+    label: String,
+    tint: androidx.compose.ui.graphics.Color
+) {
+    Column {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(16.dp)
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+private fun formatSessionDate(epochMillis: Long): String {
+    val instant = java.time.Instant.ofEpochMilli(epochMillis)
+    val zone = java.time.ZoneId.systemDefault()
+    val localDateTime = java.time.LocalDateTime.ofInstant(instant, zone)
+    val today = LocalDate.now()
+    val sessionDate = localDateTime.toLocalDate()
+    val timeStr = localDateTime.format(DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault()))
+    return when (sessionDate) {
+        today -> "Today · $timeStr"
+        today.minusDays(1) -> "Yesterday · $timeStr"
+        else -> localDateTime.format(DateTimeFormatter.ofPattern("MMM d · h:mm a", Locale.getDefault()))
+    }
+}
+
+private fun formatSessionDuration(durationMillis: Long): String {
+    val totalSeconds = durationMillis / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return if (minutes > 0) "${minutes}m ${seconds}s" else "${seconds}s"
 }

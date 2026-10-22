@@ -302,7 +302,7 @@ fun StrideFloatingNav(
                 }
                 Surface(
                     shape = CircleShape,
-                    color = if (selected) MaterialTheme.colorScheme.primary
+                    color = if (selected) MaterialTheme.colorScheme.primaryContainer
                     else androidx.compose.ui.graphics.Color.Transparent,
                     modifier = Modifier
                         .bouncyClickable(scaleDown = 0.88f) { onNavigate(dest.route) }
@@ -310,17 +310,17 @@ fun StrideFloatingNav(
                         .animateContentSize()
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = if (selected) 18.dp else 12.dp, vertical = 12.dp),
+                        modifier = Modifier.padding(horizontal = if (selected) 16.dp else 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
                             dest.icon,
                             contentDescription = label,
-                            tint = if (selected) MaterialTheme.colorScheme.onPrimary
+                            tint = if (selected) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
-                                .size(24.dp)
+                                .size(22.dp)
                                 .graphicsLayer {
                                     scaleX = pop.value
                                     scaleY = pop.value
@@ -333,8 +333,8 @@ fun StrideFloatingNav(
                         ) {
                             Text(
                                 label,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onPrimary,
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.primary,
                                 textAlign = TextAlign.Center
                             )
                         }

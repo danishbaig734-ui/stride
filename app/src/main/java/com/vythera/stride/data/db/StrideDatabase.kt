@@ -65,14 +65,42 @@ interface AchievementDao {
     suspend fun getAll(): List<AchievementEntity>
 }
 
+@Entity(tableName = "walk_sessions")
+data class WalkSessionEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val startTimeMillis: Long,
+    val endTimeMillis: Long,
+    val steps: Long,
+    val distanceMeters: Double
+) {
+    val durationMillis: Long get() = (endTimeMillis - startTimeMillis).coerceAtLeast(0L)
+    val durationMinutes: Long get() = durationMillis / 60_000L
+}
+
+@Dao
+interface WalkSessionDao {
+    @Insert
+    suspend fun insert(entity: WalkSessionEntity): Long
+
+    @Query("SELECT * FROM walk_sessions ORDER BY startTimeMillis DESC")
+    fun observeAll(): Flow<List<WalkSessionEntity>>
+
+    @Query("SELECT * FROM walk_sessions ORDER BY startTimeMillis DESC")
+    suspend fun getAll(): List<WalkSessionEntity>
+
+    @Query("DELETE FROM walk_sessions WHERE id = :id")
+    suspend fun delete(id: Long)
+}
+
 @Database(
-    entities = [DailySummaryEntity::class, AchievementEntity::class],
-    version = 1,
+    entities = [DailySummaryEntity::class, AchievementEntity::class, WalkSessionEntity::class],
+    version = 2,
     exportSchema = false
 )
 abstract class StrideDatabase : RoomDatabase() {
     abstract fun summaryDao(): SummaryDao
     abstract fun achievementDao(): AchievementDao
+    abstract fun walkSessionDao(): WalkSessionDao
 
     companion object {
         fun build(context: Context): StrideDatabase =

@@ -38,6 +38,8 @@ enum class HcState { AVAILABLE, NEEDS_UPDATE, UNAVAILABLE, GRANTED }
  */
 enum class StepSource { AUTO, PHONE, HEALTH_CONNECT }
 
+enum class ThemeStyle { CLASSIC, RETRO, VERDANT }
+
 /** Monet-style palette treatments, ColorBlendr-style. */
 enum class ColorStyle { TONAL_SPOT, NEUTRAL, MONOCHROME, VIBRANT, EXPRESSIVE }
 
@@ -62,6 +64,11 @@ data class StridePrefs(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val dynamicColor: Boolean = false,
     val paletteId: String = "tide",
+    val themeStyle: ThemeStyle = ThemeStyle.CLASSIC,
+    val liquidGlass: Boolean = false,
+    val navBarBlurDp: Float = 10f,
+    val navBarEdgeLight: Float = 0.5f,
+    val navBarRefraction: Float = 1.0f,
     val notifGoal: Boolean = true,
     val notifNudge: Boolean = true,
     val amoled: Boolean = false,
@@ -86,3 +93,9 @@ data class StridePrefs(
     val strideMeters: Double
         get() = if (strideOverrideCm > 0) strideOverrideCm / 100.0 else heightCm * 0.414 / 100.0
 }
+
+data class ActiveWalk(
+    val startTimeMillis: Long,
+    val startSteps: Long
+)
+

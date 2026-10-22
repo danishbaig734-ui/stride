@@ -23,9 +23,13 @@
     <string name="steps_to_go">%1$s steps to go</string>
     <string name="goal_crushed">Goal crushed — legendary! 🎉</string>
     <string name="first_step_quote">Every journey starts with one step</string>
+    <string name="action_walk">Walk</string>
     <string name="action_share">Share</string>
     <string name="action_goal">Goal</string>
     <string name="action_sync">Sync</string>
+    <string name="counted_by_phone">Counted by this phone</string>
+    <string name="counted_by_hc">Counted by Health Connect</string>
+    <string name="footer_community">Made with love for the community · Vythera</string>
     <string name="edit_goal">Edit goal</string>
     <string name="daily_goal">Daily goal</string>
     <string name="badge_unlocked">Badge unlocked!</string>
@@ -88,6 +92,18 @@
 
     <!-- Settings -->
     <string name="appearance">Appearance</string>
+    <string name="theme_style">Theme style</string>
+    <string name="theme_classic">Classic</string>
+    <string name="theme_retro">Retro</string>
+    <string name="theme_verdant">Verdant</string>
+    <string name="liquid_glass">Liquid glass</string>
+    <string name="liquid_glass_sub">Simulate dynamic glass refraction across surfaces</string>
+    <string name="nav_bar_glass">Nav bar glass</string>
+    <string name="nav_bar_glass_sub">Customize blur, edge light &amp; refraction</string>
+    <string name="blur">Blur</string>
+    <string name="edge_light">Edge light</string>
+    <string name="refraction">Refraction</string>
+    <string name="reset_to_default">Reset to default</string>
     <string name="theme_system">System</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
@@ -251,4 +267,26 @@
     <string name="track_all_day">Count steps all day</string>
     <string name="track_all_day_sub">Keep counting while Stride is closed</string>
     <string name="start">Start</string>
+
+    <!-- Walk Session -->
+    <string name="start_walk">Start walk</string>
+    <string name="stop_walk">Stop walk</string>
+    <string name="walk_session">Walk session</string>
+    <string name="walk_session_sub">Track a walk with live steps, time and distance</string>
+    <string name="walk_in_progress">Walk in progress</string>
+    <string name="walk_sessions">Walk sessions</string>
+    <string name="no_walk_sessions">No recorded walk sessions yet</string>
+    <string name="walk_sessions_hint">Start a walk from the dashboard to track live steps, duration and distance.</string>
+    <string name="session_duration">Duration</string>
+    <string name="session_distance">Distance</string>
+    <string name="session_steps">Session steps</string>
+    <string name="walk_session_saved">Walk saved · %1$s steps</string>
+    <string name="resume_walk">Open live walk</string>
+    <string name="cancel_walk">Cancel walk</string>
+    <string name="cancel_walk_confirm">Discard this walk without saving?</string>
+    <string name="discard">Discard</string>
+    <string name="keep_walking">Keep walking</string>
+    <string name="pace_label">Pace</string>
+    <string name="delete_session">Delete session</string>
+    <string name="minimize">Minimize</string>
 </resources>

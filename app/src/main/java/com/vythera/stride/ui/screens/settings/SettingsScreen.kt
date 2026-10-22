@@ -6,9 +6,11 @@ import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -28,22 +30,26 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.DirectionsRun
+import androidx.compose.material.icons.rounded.BlurOn
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Celebration
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material.icons.rounded.Contrast
 import androidx.compose.material.icons.rounded.DirectionsWalk
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Height
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.MonitorWeight
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Splitscreen
 import androidx.compose.material.icons.rounded.Straighten
+import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.TrackChanges
 import androidx.compose.material.icons.rounded.Upload
@@ -52,12 +58,17 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleButton
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import com.vythera.stride.model.ThemeStyle
+import java.util.Locale
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -402,29 +413,164 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 }
             }
             Text(
-                stringResource(R.string.color_style),
+                stringResource(R.string.theme_style),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp)
+                modifier = Modifier.padding(top = 10.dp)
             )
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                ColorStyle.entries.forEach { style ->
-                    ToggleButton(
-                        checked = prefs.colorStyle == style,
-                        onCheckedChange = { if (it) viewModel.set { viewModel.p.setColorStyle(style) } }
+                ThemeStyleCard(
+                    title = stringResource(R.string.theme_classic),
+                    selected = prefs.themeStyle == ThemeStyle.CLASSIC,
+                    accentColor = Color(0xFF00A88E),
+                    backgroundColor = Color(0xFF131D1B),
+                    onClick = { viewModel.set { viewModel.p.setThemeStyle(ThemeStyle.CLASSIC) } },
+                    modifier = Modifier.weight(1f)
+                )
+                ThemeStyleCard(
+                    title = stringResource(R.string.theme_retro),
+                    selected = prefs.themeStyle == ThemeStyle.RETRO,
+                    accentColor = Color(0xFF00E5FF),
+                    backgroundColor = Color(0xFF0A0E14),
+                    onClick = { viewModel.set { viewModel.p.setThemeStyle(ThemeStyle.RETRO) } },
+                    modifier = Modifier.weight(1f)
+                )
+                ThemeStyleCard(
+                    title = stringResource(R.string.theme_verdant),
+                    selected = prefs.themeStyle == ThemeStyle.VERDANT,
+                    accentColor = Color(0xFFB2FF59),
+                    backgroundColor = Color(0xFF0C140C),
+                    onClick = { viewModel.set { viewModel.p.setThemeStyle(ThemeStyle.VERDANT) } },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            SettingRow(
+                title = stringResource(R.string.liquid_glass),
+                subtitle = stringResource(R.string.liquid_glass_sub),
+                icon = Icons.Rounded.BlurOn
+            ) {
+                IconSwitch(
+                    checked = prefs.liquidGlass,
+                    icon = Icons.Rounded.BlurOn,
+                    onCheckedChange = { on -> viewModel.set { viewModel.p.setLiquidGlass(on) } }
+                )
+            }
+
+            var navBarGlassExpanded by remember { mutableStateOf(false) }
+
+            SettingRow(
+                title = stringResource(R.string.nav_bar_glass),
+                subtitle = stringResource(R.string.nav_bar_glass_sub),
+                icon = Icons.Rounded.Layers,
+                onClick = { navBarGlassExpanded = !navBarGlassExpanded }
+            ) {
+                Icon(
+                    imageVector = if (navBarGlassExpanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            AnimatedVisibility(visible = navBarGlassExpanded) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        Text(
-                            when (style) {
-                                ColorStyle.TONAL_SPOT -> stringResource(R.string.style_tonal_spot)
-                                ColorStyle.NEUTRAL -> stringResource(R.string.style_neutral)
-                                ColorStyle.MONOCHROME -> stringResource(R.string.style_monochrome)
-                                ColorStyle.VIBRANT -> stringResource(R.string.style_vibrant)
-                                ColorStyle.EXPRESSIVE -> stringResource(R.string.style_expressive)
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    stringResource(R.string.blur),
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    "${prefs.navBarBlurDp.toInt()} dp",
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
                             }
-                        )
+                            Slider(
+                                value = prefs.navBarBlurDp,
+                                onValueChange = { v -> viewModel.set { viewModel.p.setNavBarBlur(v) } },
+                                valueRange = 0f..25f
+                            )
+                        }
+
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    stringResource(R.string.edge_light),
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    String.format(Locale.US, "%.1fx", prefs.navBarEdgeLight),
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Slider(
+                                value = prefs.navBarEdgeLight,
+                                onValueChange = { v -> viewModel.set { viewModel.p.setNavBarEdgeLight(v) } },
+                                valueRange = 0f..1f
+                            )
+                        }
+
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    stringResource(R.string.refraction),
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    String.format(Locale.US, "%.1fx", prefs.navBarRefraction),
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Slider(
+                                value = prefs.navBarRefraction,
+                                onValueChange = { v -> viewModel.set { viewModel.p.setNavBarRefraction(v) } },
+                                valueRange = 1f..2f
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(
+                                onClick = { viewModel.set { viewModel.p.resetNavBarGlass() } }
+                            ) {
+                                Text(
+                                    stringResource(R.string.reset_to_default),
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -1042,3 +1188,65 @@ private fun IconSwitch(
         }
     )
 }
+
+@Composable
+private fun ThemeStyleCard(
+    title: String,
+    selected: Boolean,
+    accentColor: Color,
+    backgroundColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+        modifier = modifier
+            .bouncyClickable(scaleDown = 0.94f, onClick = onClick)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(backgroundColor),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = accentColor,
+                    modifier = Modifier.height(18.dp)
+                ) {
+                    Box(modifier = Modifier.size(width = 38.dp, height = 18.dp))
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                if (selected) {
+                    Icon(
+                        Icons.Rounded.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp).padding(end = 2.dp)
+                    )
+                }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                    ),
+                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+    }
+}
+

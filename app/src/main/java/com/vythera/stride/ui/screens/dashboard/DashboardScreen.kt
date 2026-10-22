@@ -40,9 +40,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DirectionsWalk
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.EmojiEvents
+import androidx.compose.ui.text.font.FontWeight
+import com.vythera.stride.model.StepSource
+import com.vythera.stride.model.StatSource
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.IosShare
 import androidx.compose.material.icons.rounded.LocalFireDepartment
@@ -86,6 +91,7 @@ import androidx.compose.ui.res.stringResource
 import com.vythera.stride.R
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -98,6 +104,13 @@ import com.vythera.stride.model.HcState
 import com.vythera.stride.model.StridePrefs
 import com.vythera.stride.share.ShareCardRenderer
 import com.vythera.stride.share.ShareColors
+import android.widget.Toast
+import com.vythera.stride.data.db.DailySummaryEntity
+import com.vythera.stride.data.db.WalkSessionEntity
+import com.vythera.stride.model.ActiveWalk
+import com.vythera.stride.ui.components.ActiveWalkBanner
+import com.vythera.stride.ui.components.StartWalkCard
+import com.vythera.stride.ui.components.WalkSessionOverlay
 import com.vythera.stride.ui.components.AnimatedCounter
 import com.vythera.stride.ui.components.ConfettiBurst
 import com.vythera.stride.ui.components.GoalEditor
@@ -141,17 +154,27 @@ class DashboardViewModel : ViewModel() {
     val uiState: StateFlow<DashboardUiState> = combine(
         repo.observeToday(),
         prefs.prefs,
-        repo.observeRange(LocalDate.now().minusDays(8), LocalDate.now()),
+        repo.observeRange(LocalDate.now().minusDays(370), LocalDate.now()),
         hcStateFlow
     ) { stats, p, recent, hcState ->
-        val yesterday = LocalDate.now().minusDays(1).toEpochDay()
-        val prev7 = recent.filter { it.epochDay < LocalDate.now().toEpochDay() }
+        val todayEpoch = LocalDate.now().toEpochDay()
+        val yesterday = todayEpoch - 1
+        val prev7 = recent.filter { it.epochDay in (todayEpoch - 7) until todayEpoch }
         val avg = if (prev7.isEmpty()) 0L else prev7.sumOf { it.steps } / prev7.size
+        val todayEntity = DailySummaryEntity(
+            epochDay = todayEpoch,
+            steps = stats.steps,
+            distanceMeters = stats.distanceMeters,
+            calories = stats.calories,
+            goal = stats.goal,
+            source = stats.source.name
+        )
+        val fullHistory = recent.filter { it.epochDay != todayEpoch } + todayEntity
         DashboardUiState(
             stats = stats,
             prefs = p,
-            streak = Streaks.compute(recent),
-            weekSteps = Streaks.weekSteps(recent),
+            streak = Streaks.compute(fullHistory),
+            weekSteps = Streaks.weekSteps(fullHistory),
             yesterdaySteps = recent.firstOrNull { it.epochDay == yesterday }?.steps ?: 0L,
             sevenDayAvg = avg,
             hcState = hcState
@@ -208,6 +231,25 @@ class DashboardViewModel : ViewModel() {
     fun hcPermissions() = hc.permissions
     fun hcContract() = hc.permissionContract()
 
+    val activeWalk: StateFlow<ActiveWalk?> = repo.activeWalk
+
+    fun startWalk() {
+        repo.startWalk(uiState.value.stats.steps)
+    }
+
+    fun stopWalk(onSaved: (WalkSessionEntity) -> Unit = {}) {
+        viewModelScope.launch {
+            val saved = repo.stopWalk(uiState.value.stats.steps, uiState.value.prefs.strideMeters)
+            if (saved != null) {
+                onSaved(saved)
+            }
+        }
+    }
+
+    fun cancelWalk() {
+        repo.cancelWalk()
+    }
+
     suspend fun buildShareIntent(
         context: Context,
         colors: ShareColors
@@ -243,6 +285,18 @@ fun DashboardScreen(
 
     var showGoalSheet by remember { mutableStateOf(false) }
     val goalSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    var showSourceSheet by remember { mutableStateOf(false) }
+    val sourceSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val activeWalk by viewModel.activeWalk.collectAsStateWithLifecycle()
+    var showWalkOverlay by remember { mutableStateOf(false) }
+
+    LaunchedEffect(activeWalk) {
+        if (activeWalk != null) {
+            showWalkOverlay = true
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(viewModel.hcContract()) {
         viewModel.refreshHcState()
@@ -304,10 +358,28 @@ fun DashboardScreen(
                         modifier = Modifier.entrance(0)
                     )
                 } else {
-                    // The banner offers "stop", so the start half of the pair
-                    // belongs beside it rather than four taps into Settings.
                     StartTrackingCard(
                         onStart = startTracking,
+                        modifier = Modifier.entrance(0)
+                    )
+                }
+
+                val currentWalk = activeWalk
+                if (currentWalk != null) {
+                    ActiveWalkBanner(
+                        activeWalk = currentWalk,
+                        currentTodaySteps = state.stats.steps,
+                        onResume = { showWalkOverlay = true },
+                        onStop = {
+                            viewModel.stopWalk { saved ->
+                                showWalkOverlay = false
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.walk_session_saved, Formatters.steps(saved.steps)),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        },
                         modifier = Modifier.entrance(0)
                     )
                 }
@@ -317,6 +389,14 @@ fun DashboardScreen(
                     celebrationKey = celebration,
                     onEditGoal = { showGoalSheet = true },
                     modifier = Modifier.entrance(1)
+                )
+
+                StepSourceIndicator(
+                    hcState = state.hcState,
+                    onClick = { showSourceSheet = true },
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .entrance(1)
                 )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -367,16 +447,17 @@ fun DashboardScreen(
                     )
                 }
 
-                if (state.hcState != HcState.GRANTED) {
-                    ConnectCard(
-                        hcState = state.hcState,
-                        onConnect = { permissionLauncher.launch(viewModel.hcPermissions()) },
-                        modifier = Modifier.entrance(8)
-                    )
-                }
-
                 QuickActions(
-                    modifier = Modifier.entrance(9),
+                    modifier = Modifier.entrance(8),
+                    onWalk = {
+                        if (activeWalk != null) {
+                            showWalkOverlay = true
+                        } else {
+                            viewModel.startWalk()
+                            showWalkOverlay = true
+                        }
+                    },
+                    isWalking = activeWalk != null,
                     onShare = {
                         scope.launch {
                             val intent = viewModel.buildShareIntent(context, shareColors)
@@ -388,7 +469,17 @@ fun DashboardScreen(
                     onAwards = onOpenAwards
                 )
 
-                Spacer(Modifier.height(120.dp)) // room for floating nav
+                Text(
+                    text = stringResource(R.string.footer_community),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp, bottom = 4.dp)
+                )
+
+                Spacer(Modifier.height(100.dp)) // room for floating nav
             }
         }
 
@@ -402,6 +493,33 @@ fun DashboardScreen(
             ),
             modifier = Modifier.fillMaxSize()
         )
+
+        val currentWalk = activeWalk
+        if (currentWalk != null && showWalkOverlay) {
+            WalkSessionOverlay(
+                activeWalk = currentWalk,
+                currentTodaySteps = state.stats.steps,
+                strideMeters = state.prefs.strideMeters,
+                unit = state.prefs.unit,
+                onStopWalk = {
+                    viewModel.stopWalk { saved ->
+                        showWalkOverlay = false
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.walk_session_saved, Formatters.steps(saved.steps)),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                },
+                onCancelWalk = {
+                    viewModel.cancelWalk()
+                    showWalkOverlay = false
+                },
+                onMinimize = {
+                    showWalkOverlay = false
+                }
+            )
+        }
     }
 
     if (showGoalSheet) {
@@ -417,6 +535,74 @@ fun DashboardScreen(
                 )
                 GoalEditor(goal = state.prefs.dailyGoal, onGoalChange = { viewModel.setGoal(it) })
                 Spacer(Modifier.height(32.dp))
+            }
+        }
+    }
+
+    if (showSourceSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showSourceSheet = false },
+            sheetState = sourceSheetState
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            if (state.hcState == HcState.GRANTED) Icons.Rounded.FavoriteBorder else Icons.Rounded.DirectionsWalk,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+                Text(
+                    text = if (state.hcState == HcState.GRANTED) stringResource(R.string.counted_by_hc) else stringResource(R.string.counted_by_phone),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = when (state.hcState) {
+                        HcState.GRANTED -> stringResource(R.string.hc_connect_body)
+                        HcState.AVAILABLE -> stringResource(R.string.hc_connect_body)
+                        HcState.NEEDS_UPDATE -> stringResource(R.string.hc_update_body)
+                        else -> stringResource(R.string.hc_sensor_body)
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+                if (state.hcState == HcState.AVAILABLE) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(CircleShape)
+                            .clickable {
+                                showSourceSheet = false
+                                permissionLauncher.launch(viewModel.hcPermissions())
+                            }
+                    ) {
+                        Text(
+                            text = stringResource(R.string.connect),
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(vertical = 12.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
             }
         }
     }
@@ -451,11 +637,15 @@ private fun DashboardHeader(streak: Int, modifier: Modifier = Modifier) {
             )
             Text(
                 text = "Stride",
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onBackground
             )
         }
-        AnimatedVisibility(visible = streak > 0, enter = fadeIn() + scaleIn()) {
+        AnimatedVisibility(
+            visible = streak > 0,
+            enter = fadeIn() + scaleIn(),
+            exit = fadeOut()
+        ) {
             Surface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.tertiaryContainer
@@ -473,11 +663,54 @@ private fun DashboardHeader(streak: Int, modifier: Modifier = Modifier) {
                     )
                     Text(
                         text = "$streak",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onTertiaryContainer
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun StepSourceIndicator(
+    hcState: HcState,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = CircleShape,
+        color = Color.Transparent,
+        modifier = modifier
+            .clip(CircleShape)
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                Icons.Rounded.DirectionsWalk,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
+            )
+            Text(
+                text = if (hcState == HcState.GRANTED) {
+                    stringResource(R.string.counted_by_hc)
+                } else {
+                    stringResource(R.string.counted_by_phone)
+                },
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Icon(
+                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 }
@@ -554,15 +787,15 @@ private fun HeroCard(
                 Box(contentAlignment = Alignment.Center) {
                     val density = LocalDensity.current
                     val ringStroke = remember(density) {
-                        with(density) { Stroke(width = 13.dp.toPx(), cap = StrokeCap.Round) }
+                        with(density) { Stroke(width = 12.dp.toPx(), cap = StrokeCap.Round) }
                     }
                     val trackStroke = remember(density) {
-                        with(density) { Stroke(width = 13.dp.toPx(), cap = StrokeCap.Round) }
+                        with(density) { Stroke(width = 12.dp.toPx(), cap = StrokeCap.Round) }
                     }
                     CircularWavyProgressIndicator(
                         progress = { progress },
                         modifier = Modifier
-                            .size(258.dp)
+                            .size(244.dp)
                             .graphicsLayer {
                                 scaleX = ringScale
                                 scaleY = ringScale
@@ -572,14 +805,17 @@ private fun HeroCard(
                         trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                         stroke = ringStroke,
                         trackStroke = trackStroke,
-                        wavelength = 38.dp,
+                        wavelength = 36.dp,
                         amplitude = { if (goalHit) 1f else breathe },
-                        waveSpeed = if (goalHit) 26.dp else 10.dp
+                        waveSpeed = if (goalHit) 22.dp else 10.dp
                     )
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         AnimatedCounter(
                             value = shownSteps.toLong(),
-                            style = MaterialTheme.typography.displayLarge,
+                            style = MaterialTheme.typography.displayLarge.copy(
+                                fontSize = 54.sp,
+                                fontWeight = FontWeight.Bold
+                            ),
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
@@ -598,7 +834,7 @@ private fun HeroCard(
                             Formatters.steps((stats.goal - stats.steps).coerceAtLeast(0))
                         )
                     },
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                     color = if (goalHit) MaterialTheme.colorScheme.tertiary
                     else MaterialTheme.colorScheme.primary,
                     textAlign = TextAlign.Center
@@ -737,28 +973,28 @@ private fun ConnectCard(hcState: HcState, onConnect: () -> Unit, modifier: Modif
 @Composable
 private fun StartTrackingCard(onStart: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(24.dp))
             .clickable(onClick = onStart)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Icon(
                 Icons.Rounded.DirectionsWalk,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(24.dp)
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     stringResource(R.string.track_all_day),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
@@ -768,14 +1004,14 @@ private fun StartTrackingCard(onStart: () -> Unit, modifier: Modifier = Modifier
                 )
             }
             Surface(
-                shape = RoundedCornerShape(50),
+                shape = CircleShape,
                 color = MaterialTheme.colorScheme.primary
             ) {
                 Text(
                     text = stringResource(R.string.start),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 9.dp)
                 )
             }
         }
@@ -785,12 +1021,12 @@ private fun StartTrackingCard(onStart: () -> Unit, modifier: Modifier = Modifier
 @Composable
 private fun TrackingBanner(onStop: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.secondaryContainer,
         modifier = modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -814,7 +1050,7 @@ private fun TrackingBanner(onStop: () -> Unit, modifier: Modifier = Modifier) {
             ) {
                 Text(
                     text = stringResource(R.string.stop),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 7.dp)
                 )
@@ -825,6 +1061,8 @@ private fun TrackingBanner(onStop: () -> Unit, modifier: Modifier = Modifier) {
 
 @Composable
 private fun QuickActions(
+    onWalk: () -> Unit,
+    isWalking: Boolean,
     onShare: () -> Unit,
     onGoal: () -> Unit,
     onSync: () -> Unit,
@@ -833,12 +1071,34 @@ private fun QuickActions(
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        QuickAction(Icons.Rounded.IosShare, stringResource(R.string.action_share), onShare)
-        QuickAction(Icons.Rounded.TrackChanges, stringResource(R.string.action_goal), onGoal)
-        QuickAction(Icons.Rounded.Sync, stringResource(R.string.action_sync), onSync)
-        QuickAction(Icons.Rounded.EmojiEvents, stringResource(R.string.nav_awards), onAwards)
+        QuickAction(
+            icon = Icons.Rounded.DirectionsWalk,
+            label = stringResource(R.string.action_walk),
+            isActive = isWalking,
+            onClick = onWalk
+        )
+        QuickAction(
+            icon = Icons.Rounded.IosShare,
+            label = stringResource(R.string.action_share),
+            onClick = onShare
+        )
+        QuickAction(
+            icon = Icons.Rounded.TrackChanges,
+            label = stringResource(R.string.action_goal),
+            onClick = onGoal
+        )
+        QuickAction(
+            icon = Icons.Rounded.Sync,
+            label = stringResource(R.string.action_sync),
+            onClick = onSync
+        )
+        QuickAction(
+            icon = Icons.Rounded.EmojiEvents,
+            label = stringResource(R.string.nav_awards),
+            onClick = onAwards
+        )
     }
 }
 
@@ -846,26 +1106,29 @@ private fun QuickActions(
 private fun QuickAction(
     icon: ImageVector,
     label: String,
+    isActive: Boolean = false,
     onClick: () -> Unit
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Surface(
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainer,
+            color = if (isActive) MaterialTheme.colorScheme.primaryContainer
+            else MaterialTheme.colorScheme.surfaceContainerHigh,
             modifier = Modifier
-                .bouncyClickable(scaleDown = 0.85f, onClick = onClick)
-                .size(64.dp)
+                .bouncyClickable(scaleDown = 0.88f, onClick = onClick)
+                .size(56.dp)
                 .clip(CircleShape)
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     icon,
                     contentDescription = label,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(26.dp)
+                    tint = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer
+                    else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
                 )
             }
         }
