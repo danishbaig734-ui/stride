@@ -28,6 +28,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import com.vythera.stride.ui.components.LiquidGlassBackground
+import com.vythera.stride.ui.components.liquidGlassContainerColor
+import com.vythera.stride.ui.components.liquidGlassEffect
+import dev.chrisbanes.haze.HazeState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.DirectionsRun
 import androidx.compose.material.icons.rounded.BlurOn
@@ -208,8 +212,12 @@ class SettingsViewModel : ViewModel() {
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
+fun SettingsScreen(
+    hazeState: HazeState? = null,
+    viewModel: SettingsViewModel = viewModel()
+) {
     val prefs by viewModel.state.collectAsStateWithLifecycle()
+    val liquidGlassEnabled = prefs.liquidGlass
     val hcState by viewModel.hcState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -312,22 +320,33 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Spacer(Modifier.height(8.dp))
-        Text(
-            stringResource(R.string.nav_settings),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.entrance(0)
+    Box(modifier = Modifier.fillMaxSize()) {
+        LiquidGlassBackground(
+            hazeState = hazeState,
+            enabled = liquidGlassEnabled
         )
 
-        SettingsCard(title = stringResource(R.string.appearance), modifier = Modifier.entrance(1)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.nav_settings),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.entrance(0)
+            )
+
+            SettingsCard(
+                title = stringResource(R.string.appearance),
+                hazeState = hazeState,
+                liquidGlass = liquidGlassEnabled,
+                modifier = Modifier.entrance(1)
+            ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 ThemeMode.entries.forEach { mode ->
                     ToggleButton(
@@ -476,10 +495,14 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             }
 
             AnimatedVisibility(visible = navBarGlassExpanded) {
+                val glassPanelShape = RoundedCornerShape(20.dp)
                 Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp)
+                    shape = glassPanelShape,
+                    color = liquidGlassContainerColor(liquidGlassEnabled, MaterialTheme.colorScheme.surfaceContainerHigh),
+                    modifier = Modifier
+                        .liquidGlassEffect(hazeState, liquidGlassEnabled, glassPanelShape)
+                        .fillMaxWidth()
+                        .padding(top = 4.dp, bottom = 4.dp)
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp),
@@ -911,6 +934,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
 
         Spacer(Modifier.height(120.dp))
     }
+    }
 
     foundUpdate?.let { info ->
         UpdateDialog(info = info, onDismiss = { foundUpdate = null })
@@ -1000,7 +1024,14 @@ private fun SliderDialog(spec: SliderDialogSpec, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun SettingsCard(title: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+private fun SettingsCard(
+    title: String,
+    modifier: Modifier = Modifier,
+    hazeState: HazeState? = null,
+    liquidGlass: Boolean = false,
+    content: @Composable () -> Unit
+) {
+    val cardShape = RoundedCornerShape(24.dp)
     Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = modifier) {
         Text(
             text = title,
@@ -1009,9 +1040,11 @@ private fun SettingsCard(title: String, modifier: Modifier = Modifier, content: 
             modifier = Modifier.padding(start = 4.dp)
         )
         Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            modifier = Modifier.fillMaxWidth()
+            shape = cardShape,
+            color = liquidGlassContainerColor(liquidGlass, MaterialTheme.colorScheme.surfaceContainer),
+            modifier = Modifier
+                .liquidGlassEffect(hazeState, liquidGlass, cardShape)
+                .fillMaxWidth()
         ) {
             Column(
                 modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),

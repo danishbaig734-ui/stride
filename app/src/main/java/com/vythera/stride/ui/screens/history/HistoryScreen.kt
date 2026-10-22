@@ -8,6 +8,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,6 +19,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import com.vythera.stride.ui.components.LiquidGlassBackground
+import com.vythera.stride.ui.components.liquidGlassContainerColor
+import com.vythera.stride.ui.components.liquidGlassEffect
+import dev.chrisbanes.haze.HazeState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
@@ -99,8 +104,12 @@ class HistoryViewModel : ViewModel() {
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun HistoryScreen(viewModel: HistoryViewModel = viewModel()) {
+fun HistoryScreen(
+    hazeState: HazeState? = null,
+    viewModel: HistoryViewModel = viewModel()
+) {
     val data by viewModel.data.collectAsStateWithLifecycle()
+    val liquidGlassEnabled = data.prefs.liquidGlass
     val walkSessions by viewModel.walkSessions.collectAsStateWithLifecycle()
     var monthMode by rememberSaveable { mutableStateOf(false) }
     var weekOffset by rememberSaveable { mutableStateOf(0) }
@@ -114,20 +123,26 @@ fun HistoryScreen(viewModel: HistoryViewModel = viewModel()) {
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Spacer(Modifier.height(8.dp))
-        Text(
-            stringResource(R.string.nav_history),
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.entrance(0)
+    Box(modifier = Modifier.fillMaxSize()) {
+        LiquidGlassBackground(
+            hazeState = hazeState,
+            enabled = liquidGlassEnabled
         )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.nav_history),
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.entrance(0)
+            )
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.entrance(1)) {
             ToggleButton(checked = !monthMode, onCheckedChange = { if (it) monthMode = false }, modifier = Modifier.weight(1f)) {
@@ -154,7 +169,9 @@ fun HistoryScreen(viewModel: HistoryViewModel = viewModel()) {
                     goal = data.prefs.dailyGoal,
                     selected = selected,
                     onSelect = { selected = it },
-                    onOffsetChange = { weekOffset = it }
+                    onOffsetChange = { weekOffset = it },
+                    hazeState = hazeState,
+                    liquidGlass = liquidGlassEnabled
                 )
             } else {
                 MonthSection(
@@ -162,7 +179,9 @@ fun HistoryScreen(viewModel: HistoryViewModel = viewModel()) {
                     month = month,
                     selected = selected,
                     onSelect = { selected = it },
-                    onMonthChange = { month = it }
+                    onMonthChange = { month = it },
+                    hazeState = hazeState,
+                    liquidGlass = liquidGlassEnabled
                 )
             }
         }
@@ -176,12 +195,23 @@ fun HistoryScreen(viewModel: HistoryViewModel = viewModel()) {
             label = "dayDetail"
         ) { date ->
             if (date != null) {
-                DayDetailCard(date = date, bar = byDay[date], prefs = data.prefs)
+                DayDetailCard(
+                    date = date,
+                    bar = byDay[date],
+                    prefs = data.prefs,
+                    hazeState = hazeState,
+                    liquidGlass = liquidGlassEnabled
+                )
             }
         }
 
         TotalsCard(
-            byDay = byDay, monthMode = monthMode, month = month, weekOffset = weekOffset,
+            byDay = byDay,
+            monthMode = monthMode,
+            month = month,
+            weekOffset = weekOffset,
+            hazeState = hazeState,
+            liquidGlass = liquidGlassEnabled,
             modifier = Modifier.entrance(4)
         )
 
@@ -189,12 +219,14 @@ fun HistoryScreen(viewModel: HistoryViewModel = viewModel()) {
             sessions = walkSessions,
             unit = data.prefs.unit,
             onDelete = { viewModel.deleteSession(it) },
+            hazeState = hazeState,
+            liquidGlass = liquidGlassEnabled,
             modifier = Modifier.entrance(5)
         )
 
         Spacer(Modifier.height(120.dp))
     }
-
+    }
 }
 
 private fun weekStart(offset: Int): LocalDate {
@@ -210,17 +242,22 @@ private fun WeekSection(
     goal: Int,
     selected: LocalDate?,
     onSelect: (LocalDate) -> Unit,
-    onOffsetChange: (Int) -> Unit
+    onOffsetChange: (Int) -> Unit,
+    hazeState: HazeState? = null,
+    liquidGlass: Boolean = false
 ) {
     val start = weekStart(weekOffset)
     val days = (0..6).map { i ->
         val date = start.plusDays(i.toLong())
         byDay[date] ?: DayBar(date, 0, goal)
     }
+    val cardShape = RoundedCornerShape(28.dp)
     Surface(
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.fillMaxWidth()
+        shape = cardShape,
+        color = liquidGlassContainerColor(liquidGlass, MaterialTheme.colorScheme.surfaceContainer),
+        modifier = Modifier
+            .liquidGlassEffect(hazeState, liquidGlass, cardShape)
+            .fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(
@@ -253,12 +290,17 @@ private fun MonthSection(
     month: YearMonth,
     selected: LocalDate?,
     onSelect: (LocalDate) -> Unit,
-    onMonthChange: (YearMonth) -> Unit
+    onMonthChange: (YearMonth) -> Unit,
+    hazeState: HazeState? = null,
+    liquidGlass: Boolean = false
 ) {
+    val cardShape = RoundedCornerShape(28.dp)
     Surface(
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.fillMaxWidth()
+        shape = cardShape,
+        color = liquidGlassContainerColor(liquidGlass, MaterialTheme.colorScheme.surfaceContainer),
+        modifier = Modifier
+            .liquidGlassEffect(hazeState, liquidGlass, cardShape)
+            .fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(
@@ -286,14 +328,23 @@ private fun MonthSection(
 }
 
 @Composable
-private fun DayDetailCard(date: LocalDate, bar: DayBar?, prefs: StridePrefs) {
+private fun DayDetailCard(
+    date: LocalDate,
+    bar: DayBar?,
+    prefs: StridePrefs,
+    hazeState: HazeState? = null,
+    liquidGlass: Boolean = false
+) {
     val steps = bar?.steps ?: 0L
     val distance = steps * prefs.strideMeters
     val calories = steps * 0.04 * (prefs.weightKg / 70.0)
+    val cardShape = RoundedCornerShape(28.dp)
     Surface(
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.primaryContainer,
-        modifier = Modifier.fillMaxWidth()
+        shape = cardShape,
+        color = liquidGlassContainerColor(liquidGlass, MaterialTheme.colorScheme.primaryContainer, 0.75f),
+        modifier = Modifier
+            .liquidGlassEffect(hazeState, liquidGlass, cardShape)
+            .fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(
@@ -340,7 +391,9 @@ private fun TotalsCard(
     monthMode: Boolean,
     month: YearMonth,
     weekOffset: Int,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    hazeState: HazeState? = null,
+    liquidGlass: Boolean = false
 ) {
     val days = if (monthMode) {
         byDay.values.filter { YearMonth.from(it.date) == month }
@@ -352,10 +405,13 @@ private fun TotalsCard(
     val best = days.maxByOrNull { it.steps }
     val goalsMet = days.count { it.goalMet }
 
+    val cardShape = RoundedCornerShape(28.dp)
     Surface(
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = modifier.fillMaxWidth()
+        shape = cardShape,
+        color = liquidGlassContainerColor(liquidGlass, MaterialTheme.colorScheme.surfaceContainer),
+        modifier = modifier
+            .liquidGlassEffect(hazeState, liquidGlass, cardShape)
+            .fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
@@ -391,7 +447,9 @@ private fun WalkSessionsSection(
     sessions: List<WalkSessionEntity>,
     unit: UnitSystem,
     onDelete: (Long) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    hazeState: HazeState? = null,
+    liquidGlass: Boolean = false
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -436,10 +494,13 @@ private fun WalkSessionsSection(
         }
 
         if (sessions.isEmpty()) {
+            val emptyCardShape = RoundedCornerShape(24.dp)
             Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                modifier = Modifier.fillMaxWidth()
+                shape = emptyCardShape,
+                color = liquidGlassContainerColor(liquidGlass, MaterialTheme.colorScheme.surfaceContainer),
+                modifier = Modifier
+                    .liquidGlassEffect(hazeState, liquidGlass, emptyCardShape)
+                    .fillMaxWidth()
             ) {
                 Column(
                     modifier = Modifier
@@ -472,7 +533,9 @@ private fun WalkSessionsSection(
                 WalkSessionCard(
                     session = session,
                     unit = unit,
-                    onDelete = { onDelete(session.id) }
+                    onDelete = { onDelete(session.id) },
+                    hazeState = hazeState,
+                    liquidGlass = liquidGlass
                 )
             }
         }
@@ -483,12 +546,16 @@ private fun WalkSessionsSection(
 private fun WalkSessionCard(
     session: WalkSessionEntity,
     unit: UnitSystem,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    hazeState: HazeState? = null,
+    liquidGlass: Boolean = false
 ) {
+    val cardShape = RoundedCornerShape(20.dp)
     Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = cardShape,
+        color = liquidGlassContainerColor(liquidGlass, MaterialTheme.colorScheme.surfaceContainer),
         modifier = Modifier
+            .liquidGlassEffect(hazeState, liquidGlass, cardShape)
             .fillMaxWidth()
             .testTag("walk_session_card_${session.id}")
     ) {

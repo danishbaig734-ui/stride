@@ -18,7 +18,13 @@ import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.hazeEffect
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -111,7 +117,7 @@ class MainActivity : ComponentActivity() {
                                 OnboardingScreen(onDone = { onboarded = true })
                             }
                         } else {
-                            StrideMain()
+                            StrideMain(prefs = prefs)
                         }
                     }
                 }
@@ -147,7 +153,9 @@ private val destinations = listOf(
 )
 
 @Composable
-fun StrideMain() {
+fun StrideMain(prefs: StridePrefs? = null) {
+    val livePrefs by Graph.prefs.prefs.collectAsState(initial = prefs ?: StridePrefs())
+    val hazeState = remember { HazeState() }
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route ?: "today"
@@ -179,16 +187,21 @@ fun StrideMain() {
                 exitTransition = { fadeOut(tween(80)) }
             ) {
                 composable("today") {
-                    DashboardScreen(onOpenAwards = { navController.navigateSingleTop("awards") })
+                    DashboardScreen(
+                        onOpenAwards = { navController.navigateSingleTop("awards") },
+                        hazeState = hazeState
+                    )
                 }
-                composable("history") { HistoryScreen() }
-                composable("awards") { AwardsScreen() }
-                composable("settings") { SettingsScreen() }
+                composable("history") { HistoryScreen(hazeState = hazeState) }
+                composable("awards") { AwardsScreen(hazeState = hazeState) }
+                composable("settings") { SettingsScreen(hazeState = hazeState) }
             }
 
             StrideFloatingNav(
                 currentRoute = currentRoute,
                 onNavigate = { route -> navController.navigateSingleTop(route) },
+                prefs = livePrefs,
+                hazeState = hazeState,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
@@ -270,13 +283,49 @@ private fun AchievementToast(def: AchievementDef, onDismiss: () -> Unit) {
 fun StrideFloatingNav(
     currentRoute: String,
     onNavigate: (String) -> Unit,
+    prefs: StridePrefs,
+    hazeState: HazeState,
     modifier: Modifier = Modifier
 ) {
+    val blurRadius = prefs.navBarBlurDp.dp
+    val edgeLightAlpha = prefs.navBarEdgeLight.coerceIn(0f, 1f)
+    val refraction = prefs.navBarRefraction.coerceIn(1f, 2f)
+
+    // 1dp border using Modifier.border with white gradient brush where alpha is controlled by Edge light slider
+    val edgeLightBrush = Brush.verticalGradient(
+        colors = listOf(
+            Color.White.copy(alpha = edgeLightAlpha),
+            Color.White.copy(alpha = edgeLightAlpha * 0.25f),
+            Color.White.copy(alpha = edgeLightAlpha * 0.6f)
+        )
+    )
+
+    // Refraction simulation using Haze's built-in tint, noise, and container alpha
+    val tintAlpha = ((refraction - 1f) * 0.35f + 0.15f).coerceIn(0.1f, 0.7f)
+    val surfaceAlpha = (0.6f / refraction).coerceIn(0.25f, 0.85f)
+    val surfaceContainerColor = MaterialTheme.colorScheme.surfaceContainer
+    val navContainerColor = surfaceContainerColor.copy(
+        alpha = if (prefs.navBarBlurDp > 0f) surfaceAlpha else 1f
+    )
+
     Surface(
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = navContainerColor,
         shadowElevation = 12.dp,
         modifier = modifier
+            .hazeEffect(state = hazeState) {
+                this.blurRadius = blurRadius
+                this.blurEnabled = prefs.navBarBlurDp > 0f
+                this.tints = listOf(
+                    HazeTint(surfaceContainerColor.copy(alpha = tintAlpha))
+                )
+                this.noiseFactor = (refraction - 1f) * 0.12f
+            }
+            .border(
+                width = 1.dp,
+                brush = edgeLightBrush,
+                shape = CircleShape
+            )
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),

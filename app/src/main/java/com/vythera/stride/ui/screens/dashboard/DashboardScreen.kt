@@ -114,11 +114,15 @@ import com.vythera.stride.ui.components.WalkSessionOverlay
 import com.vythera.stride.ui.components.AnimatedCounter
 import com.vythera.stride.ui.components.ConfettiBurst
 import com.vythera.stride.ui.components.GoalEditor
+import com.vythera.stride.ui.components.LiquidGlassBackground
+import com.vythera.stride.ui.components.liquidGlassContainerColor
+import com.vythera.stride.ui.components.liquidGlassEffect
 import com.vythera.stride.ui.components.StatChip
 import com.vythera.stride.ui.components.bouncyClickable
 import com.vythera.stride.ui.components.entrance
 import com.vythera.stride.ui.components.pulse
 import com.vythera.stride.util.Formatters
+import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -274,9 +278,11 @@ class DashboardViewModel : ViewModel() {
 @Composable
 fun DashboardScreen(
     onOpenAwards: () -> Unit,
+    hazeState: HazeState? = null,
     viewModel: DashboardViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val liquidGlassEnabled = state.prefs.liquidGlass
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val celebration by viewModel.celebration.collectAsStateWithLifecycle()
     val haptics = LocalHapticFeedback.current
@@ -337,6 +343,11 @@ fun DashboardScreen(
     val shareColors = shareColorsFromTheme()
 
     Box(modifier = Modifier.fillMaxSize()) {
+        LiquidGlassBackground(
+            hazeState = hazeState,
+            enabled = liquidGlassEnabled
+        )
+
         PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = { viewModel.refresh() },
@@ -355,11 +366,15 @@ fun DashboardScreen(
                 if (state.prefs.backgroundTracking) {
                     TrackingBanner(
                         onStop = { viewModel.stopBackgroundTracking(context) },
+                        hazeState = hazeState,
+                        liquidGlass = liquidGlassEnabled,
                         modifier = Modifier.entrance(0)
                     )
                 } else {
                     StartTrackingCard(
                         onStart = startTracking,
+                        hazeState = hazeState,
+                        liquidGlass = liquidGlassEnabled,
                         modifier = Modifier.entrance(0)
                     )
                 }
@@ -388,6 +403,8 @@ fun DashboardScreen(
                     stats = state.stats,
                     celebrationKey = celebration,
                     onEditGoal = { showGoalSheet = true },
+                    hazeState = hazeState,
+                    liquidGlass = liquidGlassEnabled,
                     modifier = Modifier.entrance(1)
                 )
 
@@ -406,6 +423,8 @@ fun DashboardScreen(
                         label = stringResource(R.string.distance),
                         tint = MaterialTheme.colorScheme.primary,
                         container = MaterialTheme.colorScheme.primaryContainer,
+                        hazeState = hazeState,
+                        liquidGlass = liquidGlassEnabled,
                         modifier = Modifier.weight(1f).entrance(2)
                     )
                     StatChip(
@@ -414,6 +433,8 @@ fun DashboardScreen(
                         label = stringResource(R.string.calories),
                         tint = MaterialTheme.colorScheme.tertiary,
                         container = MaterialTheme.colorScheme.tertiaryContainer,
+                        hazeState = hazeState,
+                        liquidGlass = liquidGlassEnabled,
                         modifier = Modifier.weight(1f).entrance(3)
                     )
                     StatChip(
@@ -422,6 +443,8 @@ fun DashboardScreen(
                         label = stringResource(R.string.active_min),
                         tint = MaterialTheme.colorScheme.secondary,
                         container = MaterialTheme.colorScheme.secondaryContainer,
+                        hazeState = hazeState,
+                        liquidGlass = liquidGlassEnabled,
                         modifier = Modifier.weight(1f).entrance(4)
                     )
                 }
@@ -430,11 +453,15 @@ fun DashboardScreen(
                     SmallInfoCard(
                         title = stringResource(R.string.yesterday),
                         value = Formatters.steps(state.yesterdaySteps),
+                        hazeState = hazeState,
+                        liquidGlass = liquidGlassEnabled,
                         modifier = Modifier.weight(1f).entrance(5)
                     )
                     SmallInfoCard(
                         title = stringResource(R.string.seven_day_avg),
                         value = Formatters.steps(state.sevenDayAvg),
+                        hazeState = hazeState,
+                        liquidGlass = liquidGlassEnabled,
                         modifier = Modifier.weight(1f).entrance(6)
                     )
                 }
@@ -443,6 +470,8 @@ fun DashboardScreen(
                     WeeklyGoalCard(
                         weekSteps = state.weekSteps,
                         weeklyGoal = state.prefs.weeklyGoal,
+                        hazeState = hazeState,
+                        liquidGlass = liquidGlassEnabled,
                         modifier = Modifier.entrance(7)
                     )
                 }
@@ -721,7 +750,9 @@ private fun HeroCard(
     stats: DailyStats,
     celebrationKey: Int,
     onEditGoal: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    hazeState: HazeState? = null,
+    liquidGlass: Boolean = false
 ) {
     val progress by animateFloatAsState(
         targetValue = stats.progress.coerceIn(0f, 1f),
@@ -764,10 +795,13 @@ private fun HeroCard(
     }
     val ringScale = ringPulse.value
 
+    val cardShape = RoundedCornerShape(32.dp)
     Surface(
-        shape = RoundedCornerShape(32.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = modifier.fillMaxWidth()
+        shape = cardShape,
+        color = liquidGlassContainerColor(liquidGlass, MaterialTheme.colorScheme.surfaceContainer),
+        modifier = modifier
+            .liquidGlassEffect(hazeState, liquidGlass, cardShape)
+            .fillMaxWidth()
     ) {
         Box {
             IconButton(onClick = onEditGoal, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
@@ -845,11 +879,18 @@ private fun HeroCard(
 }
 
 @Composable
-private fun SmallInfoCard(title: String, value: String, modifier: Modifier = Modifier) {
+private fun SmallInfoCard(
+    title: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    hazeState: HazeState? = null,
+    liquidGlass: Boolean = false
+) {
+    val cardShape = RoundedCornerShape(24.dp)
     Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = modifier
+        shape = cardShape,
+        color = liquidGlassContainerColor(liquidGlass, MaterialTheme.colorScheme.surfaceContainer),
+        modifier = modifier.liquidGlassEffect(hazeState, liquidGlass, cardShape)
     ) {
         Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
@@ -868,11 +909,20 @@ private fun SmallInfoCard(title: String, value: String, modifier: Modifier = Mod
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun WeeklyGoalCard(weekSteps: Long, weeklyGoal: Int, modifier: Modifier = Modifier) {
+private fun WeeklyGoalCard(
+    weekSteps: Long,
+    weeklyGoal: Int,
+    modifier: Modifier = Modifier,
+    hazeState: HazeState? = null,
+    liquidGlass: Boolean = false
+) {
+    val cardShape = RoundedCornerShape(24.dp)
     Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = modifier.fillMaxWidth()
+        shape = cardShape,
+        color = liquidGlassContainerColor(liquidGlass, MaterialTheme.colorScheme.surfaceContainer),
+        modifier = modifier
+            .liquidGlassEffect(hazeState, liquidGlass, cardShape)
+            .fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(
@@ -971,13 +1021,20 @@ private fun ConnectCard(hcState: HcState, onConnect: () -> Unit, modifier: Modif
  * the app already had.
  */
 @Composable
-private fun StartTrackingCard(onStart: () -> Unit, modifier: Modifier = Modifier) {
+private fun StartTrackingCard(
+    onStart: () -> Unit,
+    modifier: Modifier = Modifier,
+    hazeState: HazeState? = null,
+    liquidGlass: Boolean = false
+) {
+    val cardShape = RoundedCornerShape(24.dp)
     Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = cardShape,
+        color = liquidGlassContainerColor(liquidGlass, MaterialTheme.colorScheme.surfaceContainer),
         modifier = modifier
+            .liquidGlassEffect(hazeState, liquidGlass, cardShape)
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
+            .clip(cardShape)
             .clickable(onClick = onStart)
     ) {
         Row(
@@ -1019,11 +1076,19 @@ private fun StartTrackingCard(onStart: () -> Unit, modifier: Modifier = Modifier
 }
 
 @Composable
-private fun TrackingBanner(onStop: () -> Unit, modifier: Modifier = Modifier) {
+private fun TrackingBanner(
+    onStop: () -> Unit,
+    modifier: Modifier = Modifier,
+    hazeState: HazeState? = null,
+    liquidGlass: Boolean = false
+) {
+    val cardShape = RoundedCornerShape(24.dp)
     Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        modifier = modifier.fillMaxWidth()
+        shape = cardShape,
+        color = liquidGlassContainerColor(liquidGlass, MaterialTheme.colorScheme.secondaryContainer),
+        modifier = modifier
+            .liquidGlassEffect(hazeState, liquidGlass, cardShape)
+            .fillMaxWidth()
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),

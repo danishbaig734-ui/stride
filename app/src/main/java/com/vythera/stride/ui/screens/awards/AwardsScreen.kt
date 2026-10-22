@@ -70,6 +70,11 @@ import com.vythera.stride.ui.components.entrance
 import com.vythera.stride.ui.components.pulse
 import com.vythera.stride.util.achievementDescription
 import com.vythera.stride.util.achievementTitle
+import com.vythera.stride.model.StridePrefs
+import com.vythera.stride.ui.components.LiquidGlassBackground
+import com.vythera.stride.ui.components.liquidGlassContainerColor
+import com.vythera.stride.ui.components.liquidGlassEffect
+import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -124,40 +129,59 @@ private fun badgeIcon(id: String): ImageVector = when (id) {
 }
 
 @Composable
-fun AwardsScreen(viewModel: AwardsViewModel = viewModel()) {
+fun AwardsScreen(
+    hazeState: HazeState? = null,
+    viewModel: AwardsViewModel = viewModel()
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val prefs by Graph.prefs.prefs.collectAsStateWithLifecycle(initialValue = StridePrefs())
+    val liquidGlassEnabled = prefs.liquidGlass
     var detail by remember { mutableStateOf<AchievementDef?>(null) }
 
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(bottom = 130.dp)
-    ) {
-        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(3) }) {
-            Column {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    stringResource(R.string.nav_awards),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.entrance(0)
-                )
-                Spacer(Modifier.height(16.dp))
-                StreakHero(streak = state.streak, modifier = Modifier.entrance(1))
-                Spacer(Modifier.height(8.dp))
+    Box(modifier = Modifier.fillMaxSize()) {
+        LiquidGlassBackground(
+            hazeState = hazeState,
+            enabled = liquidGlassEnabled
+        )
+
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(bottom = 130.dp)
+        ) {
+            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(3) }) {
+                Column {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        stringResource(R.string.nav_awards),
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.entrance(0)
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    StreakHero(
+                        streak = state.streak,
+                        hazeState = hazeState,
+                        liquidGlass = liquidGlassEnabled,
+                        modifier = Modifier.entrance(1)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
             }
-        }
-        itemsIndexed(Achievements.all, key = { _, def -> def.id }) { index, def ->
-            BadgeTile(
-                def = def,
-                unlockedAt = state.unlocked[def.id],
-                onClick = { detail = def },
-                modifier = Modifier.entrance(2 + index)
-            )
+            itemsIndexed(Achievements.all, key = { _, def -> def.id }) { index, def ->
+                BadgeTile(
+                    def = def,
+                    unlockedAt = state.unlocked[def.id],
+                    onClick = { detail = def },
+                    hazeState = hazeState,
+                    liquidGlass = liquidGlassEnabled,
+                    modifier = Modifier.entrance(2 + index)
+                )
+            }
         }
     }
 
@@ -194,11 +218,19 @@ fun AwardsScreen(viewModel: AwardsViewModel = viewModel()) {
 }
 
 @Composable
-private fun StreakHero(streak: StreakInfo, modifier: Modifier = Modifier) {
+private fun StreakHero(
+    streak: StreakInfo,
+    modifier: Modifier = Modifier,
+    hazeState: HazeState? = null,
+    liquidGlass: Boolean = false
+) {
+    val cardShape = RoundedCornerShape(32.dp)
     Surface(
-        shape = RoundedCornerShape(32.dp),
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-        modifier = modifier.fillMaxWidth()
+        shape = cardShape,
+        color = liquidGlassContainerColor(liquidGlass, MaterialTheme.colorScheme.tertiaryContainer, 0.75f),
+        modifier = modifier
+            .liquidGlassEffect(hazeState, liquidGlass, cardShape)
+            .fillMaxWidth()
     ) {
         Row(
             modifier = Modifier.padding(24.dp),
@@ -231,11 +263,21 @@ private fun StreakHero(streak: StreakInfo, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun BadgeTile(def: AchievementDef, unlockedAt: Long?, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun BadgeTile(
+    def: AchievementDef,
+    unlockedAt: Long?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    hazeState: HazeState? = null,
+    liquidGlass: Boolean = false
+) {
+    val cardShape = RoundedCornerShape(24.dp)
     Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = modifier.bouncyClickable(scaleDown = 0.88f, onClick = onClick)
+        shape = cardShape,
+        color = liquidGlassContainerColor(liquidGlass, MaterialTheme.colorScheme.surfaceContainer),
+        modifier = modifier
+            .liquidGlassEffect(hazeState, liquidGlass, cardShape)
+            .bouncyClickable(scaleDown = 0.88f, onClick = onClick)
     ) {
         Column(
             modifier = Modifier
