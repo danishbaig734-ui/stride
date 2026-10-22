@@ -22,6 +22,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import dev.chrisbanes.haze.HazeInputScale
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.hazeEffect
@@ -156,9 +157,14 @@ private val destinations = listOf(
 fun StrideMain(prefs: StridePrefs? = null) {
     val livePrefs by Graph.prefs.prefs.collectAsState(initial = prefs ?: StridePrefs())
     val hazeState = remember { HazeState() }
+    var isScrolling by remember { mutableStateOf(false) }
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route ?: "today"
+
+    LaunchedEffect(currentRoute) {
+        isScrolling = false
+    }
 
     var achievementToast by remember { mutableStateOf<AchievementDef?>(null) }
     var achievementBurst by remember { mutableStateOf(0) }
@@ -189,12 +195,28 @@ fun StrideMain(prefs: StridePrefs? = null) {
                 composable("today") {
                     DashboardScreen(
                         onOpenAwards = { navController.navigateSingleTop("awards") },
-                        hazeState = hazeState
+                        hazeState = hazeState,
+                        onScrollingChanged = { isScrolling = it }
                     )
                 }
-                composable("history") { HistoryScreen(hazeState = hazeState) }
-                composable("awards") { AwardsScreen(hazeState = hazeState) }
-                composable("settings") { SettingsScreen(hazeState = hazeState) }
+                composable("history") {
+                    HistoryScreen(
+                        hazeState = hazeState,
+                        onScrollingChanged = { isScrolling = it }
+                    )
+                }
+                composable("awards") {
+                    AwardsScreen(
+                        hazeState = hazeState,
+                        onScrollingChanged = { isScrolling = it }
+                    )
+                }
+                composable("settings") {
+                    SettingsScreen(
+                        hazeState = hazeState,
+                        onScrollingChanged = { isScrolling = it }
+                    )
+                }
             }
 
             StrideFloatingNav(
@@ -202,6 +224,7 @@ fun StrideMain(prefs: StridePrefs? = null) {
                 onNavigate = { route -> navController.navigateSingleTop(route) },
                 prefs = livePrefs,
                 hazeState = hazeState,
+                isScrolling = isScrolling,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
@@ -285,41 +308,50 @@ fun StrideFloatingNav(
     onNavigate: (String) -> Unit,
     prefs: StridePrefs,
     hazeState: HazeState,
+    isScrolling: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val blurRadius = prefs.navBarBlurDp.dp
+    val blurRadius = prefs.navBarBlurDp.coerceIn(0f, 20f).dp
     val edgeLightAlpha = prefs.navBarEdgeLight.coerceIn(0f, 1f)
     val refraction = prefs.navBarRefraction.coerceIn(1f, 2f)
+
+    // Performance optimization: disable blur while scrolling or if radius is 0
+    val isBlurActive = prefs.navBarBlurDp > 0f && !isScrolling
+
+    // Refraction simulation via tint and alpha adjustments (zero costly noise or shader distortions)
+    val refractionWeight = (refraction - 1f).coerceIn(0f, 1f)
+    val tintAlpha = (0.16f + refractionWeight * 0.28f).coerceIn(0.1f, 0.65f)
+    val surfaceAlpha = (0.35f - refractionWeight * 0.12f).coerceIn(0.15f, 0.6f)
+
+    val surfaceContainerColor = MaterialTheme.colorScheme.surfaceContainer
+    // Ensure transparent/semi-transparent background when blur is active; degrades to solid tint when blur is off or scrolling
+    val navContainerColor = if (isBlurActive) {
+        surfaceContainerColor.copy(alpha = surfaceAlpha)
+    } else {
+        surfaceContainerColor.copy(alpha = 0.96f)
+    }
 
     // 1dp border using Modifier.border with white gradient brush where alpha is controlled by Edge light slider
     val edgeLightBrush = Brush.verticalGradient(
         colors = listOf(
             Color.White.copy(alpha = edgeLightAlpha),
-            Color.White.copy(alpha = edgeLightAlpha * 0.25f),
-            Color.White.copy(alpha = edgeLightAlpha * 0.6f)
+            Color.White.copy(alpha = edgeLightAlpha * 0.2f),
+            Color.White.copy(alpha = edgeLightAlpha * 0.5f)
         )
-    )
-
-    // Refraction simulation using Haze's built-in tint, noise, and container alpha
-    val tintAlpha = ((refraction - 1f) * 0.35f + 0.15f).coerceIn(0.1f, 0.7f)
-    val surfaceAlpha = (0.6f / refraction).coerceIn(0.25f, 0.85f)
-    val surfaceContainerColor = MaterialTheme.colorScheme.surfaceContainer
-    val navContainerColor = surfaceContainerColor.copy(
-        alpha = if (prefs.navBarBlurDp > 0f) surfaceAlpha else 1f
     )
 
     Surface(
         shape = CircleShape,
         color = navContainerColor,
-        shadowElevation = 12.dp,
+        shadowElevation = if (isBlurActive) 0.dp else 6.dp,
         modifier = modifier
             .hazeEffect(state = hazeState) {
                 this.blurRadius = blurRadius
-                this.blurEnabled = prefs.navBarBlurDp > 0f
+                this.blurEnabled = isBlurActive
+                this.inputScale = HazeInputScale.Auto
                 this.tints = listOf(
                     HazeTint(surfaceContainerColor.copy(alpha = tintAlpha))
                 )
-                this.noiseFactor = (refraction - 1f) * 0.12f
             }
             .border(
                 width = 1.dp,

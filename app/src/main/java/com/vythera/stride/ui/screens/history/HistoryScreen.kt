@@ -34,6 +34,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -106,6 +107,7 @@ class HistoryViewModel : ViewModel() {
 @Composable
 fun HistoryScreen(
     hazeState: HazeState? = null,
+    onScrollingChanged: (Boolean) -> Unit = {},
     viewModel: HistoryViewModel = viewModel()
 ) {
     val data by viewModel.data.collectAsStateWithLifecycle()
@@ -115,6 +117,11 @@ fun HistoryScreen(
     var weekOffset by rememberSaveable { mutableStateOf(0) }
     var month by remember { mutableStateOf(YearMonth.now()) }
     var selected by remember { mutableStateOf<LocalDate?>(LocalDate.now()) }
+    val scrollState = rememberScrollState()
+
+    LaunchedEffect(scrollState.isScrollInProgress) {
+        onScrollingChanged(scrollState.isScrollInProgress)
+    }
 
     val byDay = remember(data.summaries, data.prefs.dailyGoal) {
         data.summaries.associate { s ->
@@ -132,7 +139,7 @@ fun HistoryScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {

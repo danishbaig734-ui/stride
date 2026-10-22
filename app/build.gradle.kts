@@ -101,5 +101,5 @@ dependencies {
     implementation("androidx.glance:glance-appwidget:1.1.1")
     implementation("androidx.datastore:datastore-preferences:1.1.7")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
-    implementation("dev.chrisbanes.haze:haze:1.2.0")
+    implementation("dev.chrisbanes.haze:haze:1.3.1")
 }

@@ -279,6 +279,7 @@ class DashboardViewModel : ViewModel() {
 fun DashboardScreen(
     onOpenAwards: () -> Unit,
     hazeState: HazeState? = null,
+    onScrollingChanged: (Boolean) -> Unit = {},
     viewModel: DashboardViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -288,6 +289,11 @@ fun DashboardScreen(
     val haptics = LocalHapticFeedback.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val scrollState = rememberScrollState()
+
+    LaunchedEffect(scrollState.isScrollInProgress) {
+        onScrollingChanged(scrollState.isScrollInProgress)
+    }
 
     var showGoalSheet by remember { mutableStateOf(false) }
     val goalSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -356,7 +362,7 @@ fun DashboardScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(scrollState)
                     .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {

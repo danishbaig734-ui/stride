@@ -74,6 +74,7 @@ import androidx.compose.ui.text.font.FontWeight
 import com.vythera.stride.model.ThemeStyle
 import java.util.Locale
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -214,6 +215,7 @@ class SettingsViewModel : ViewModel() {
 @Composable
 fun SettingsScreen(
     hazeState: HazeState? = null,
+    onScrollingChanged: (Boolean) -> Unit = {},
     viewModel: SettingsViewModel = viewModel()
 ) {
     val prefs by viewModel.state.collectAsStateWithLifecycle()
@@ -221,6 +223,11 @@ fun SettingsScreen(
     val hcState by viewModel.hcState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val scrollState = rememberScrollState()
+
+    LaunchedEffect(scrollState.isScrollInProgress) {
+        onScrollingChanged(scrollState.isScrollInProgress)
+    }
 
     val sourceComparison by viewModel.sourceComparison.collectAsStateWithLifecycle()
     var showHcWithdraw by remember { mutableStateOf(false) }
@@ -329,7 +336,7 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {

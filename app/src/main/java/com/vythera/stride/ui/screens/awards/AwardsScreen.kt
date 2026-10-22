@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bolt
@@ -41,6 +42,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -131,12 +133,18 @@ private fun badgeIcon(id: String): ImageVector = when (id) {
 @Composable
 fun AwardsScreen(
     hazeState: HazeState? = null,
+    onScrollingChanged: (Boolean) -> Unit = {},
     viewModel: AwardsViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val prefs by Graph.prefs.prefs.collectAsStateWithLifecycle(initialValue = StridePrefs())
     val liquidGlassEnabled = prefs.liquidGlass
     var detail by remember { mutableStateOf<AchievementDef?>(null) }
+    val gridState = rememberLazyGridState()
+
+    LaunchedEffect(gridState.isScrollInProgress) {
+        onScrollingChanged(gridState.isScrollInProgress)
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         LiquidGlassBackground(
@@ -145,6 +153,7 @@ fun AwardsScreen(
         )
 
         LazyVerticalGrid(
+            state = gridState,
             columns = GridCells.Fixed(3),
             modifier = Modifier
                 .fillMaxSize()
