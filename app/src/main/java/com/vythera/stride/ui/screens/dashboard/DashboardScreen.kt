@@ -114,15 +114,11 @@ import com.vythera.stride.ui.components.WalkSessionOverlay
 import com.vythera.stride.ui.components.AnimatedCounter
 import com.vythera.stride.ui.components.ConfettiBurst
 import com.vythera.stride.ui.components.GoalEditor
-import com.vythera.stride.ui.components.LiquidGlassBackground
-import com.vythera.stride.ui.components.liquidGlassContainerColor
-import com.vythera.stride.ui.components.liquidGlassEffect
 import com.vythera.stride.ui.components.StatChip
 import com.vythera.stride.ui.components.bouncyClickable
 import com.vythera.stride.ui.components.entrance
 import com.vythera.stride.ui.components.pulse
 import com.vythera.stride.util.Formatters
-import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow

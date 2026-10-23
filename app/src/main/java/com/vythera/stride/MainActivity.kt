@@ -21,11 +21,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import dev.chrisbanes.haze.HazeInputScale
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.hazeEffect
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -155,16 +152,9 @@ private val destinations = listOf(
 
 @Composable
 fun StrideMain(prefs: StridePrefs? = null) {
-    val livePrefs by Graph.prefs.prefs.collectAsState(initial = prefs ?: StridePrefs())
-    val hazeState = remember { HazeState() }
-    var isScrolling by remember { mutableStateOf(false) }
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route ?: "today"
-
-    LaunchedEffect(currentRoute) {
-        isScrolling = false
-    }
 
     var achievementToast by remember { mutableStateOf<AchievementDef?>(null) }
     var achievementBurst by remember { mutableStateOf(0) }
@@ -176,11 +166,19 @@ fun StrideMain(prefs: StridePrefs? = null) {
         }
     }
 
-    Scaffold(containerColor = MaterialTheme.colorScheme.background) { padding ->
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        bottomBar = {
+            StrideBottomNav(
+                currentRoute = currentRoute,
+                onNavigate = { route -> navController.navigateSingleTop(route) }
+            )
+        }
+    ) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = padding.calculateTopPadding())
+                .padding(padding)
         ) {
             NavHost(
                 navController = navController,
@@ -194,42 +192,19 @@ fun StrideMain(prefs: StridePrefs? = null) {
             ) {
                 composable("today") {
                     DashboardScreen(
-                        onOpenAwards = { navController.navigateSingleTop("awards") },
-                        hazeState = hazeState,
-                        onScrollingChanged = { isScrolling = it }
+                        onOpenAwards = { navController.navigateSingleTop("awards") }
                     )
                 }
                 composable("history") {
-                    HistoryScreen(
-                        hazeState = hazeState,
-                        onScrollingChanged = { isScrolling = it }
-                    )
+                    HistoryScreen()
                 }
                 composable("awards") {
-                    AwardsScreen(
-                        hazeState = hazeState,
-                        onScrollingChanged = { isScrolling = it }
-                    )
+                    AwardsScreen()
                 }
                 composable("settings") {
-                    SettingsScreen(
-                        hazeState = hazeState,
-                        onScrollingChanged = { isScrolling = it }
-                    )
+                    SettingsScreen()
                 }
             }
-
-            StrideFloatingNav(
-                currentRoute = currentRoute,
-                onNavigate = { route -> navController.navigateSingleTop(route) },
-                prefs = livePrefs,
-                hazeState = hazeState,
-                isScrolling = isScrolling,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(bottom = 18.dp)
-            )
 
             // Looks for a new release when one is due for the chosen frequency
             com.vythera.stride.ui.components.UpdateGate()
@@ -250,7 +225,7 @@ fun StrideMain(prefs: StridePrefs? = null) {
                 exit = fadeOut() + slideOutVertically { it / 2 },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 110.dp)
+                    .padding(bottom = 24.dp)
             ) {
                 achievementToast?.let { def ->
                     AchievementToast(def = def, onDismiss = { achievementToast = null })
@@ -303,125 +278,35 @@ private fun AchievementToast(def: AchievementDef, onDismiss: () -> Unit) {
 }
 
 @Composable
-fun StrideFloatingNav(
+fun StrideBottomNav(
     currentRoute: String,
     onNavigate: (String) -> Unit,
-    prefs: StridePrefs,
-    hazeState: HazeState,
-    isScrolling: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val blurRadius = prefs.navBarBlurDp.coerceIn(0f, 20f).dp
-    val edgeLightAlpha = prefs.navBarEdgeLight.coerceIn(0f, 1f)
-    val refraction = prefs.navBarRefraction.coerceIn(1f, 2f)
-
-    // Performance optimization: disable blur while scrolling or if radius is 0
-    val isBlurActive = prefs.navBarBlurDp > 0f && !isScrolling
-
-    // Refraction simulation via tint and alpha adjustments (zero costly noise or shader distortions)
-    val refractionWeight = (refraction - 1f).coerceIn(0f, 1f)
-    val tintAlpha = (0.16f + refractionWeight * 0.28f).coerceIn(0.1f, 0.65f)
-    val surfaceAlpha = (0.35f - refractionWeight * 0.12f).coerceIn(0.15f, 0.6f)
-
-    val surfaceContainerColor = MaterialTheme.colorScheme.surfaceContainer
-    // Ensure transparent/semi-transparent background when blur is active; degrades to solid tint when blur is off or scrolling
-    val navContainerColor = if (isBlurActive) {
-        surfaceContainerColor.copy(alpha = surfaceAlpha)
-    } else {
-        surfaceContainerColor.copy(alpha = 0.96f)
-    }
-
-    // 1dp border using Modifier.border with white gradient brush where alpha is controlled by Edge light slider
-    val edgeLightBrush = Brush.verticalGradient(
-        colors = listOf(
-            Color.White.copy(alpha = edgeLightAlpha),
-            Color.White.copy(alpha = edgeLightAlpha * 0.2f),
-            Color.White.copy(alpha = edgeLightAlpha * 0.5f)
-        )
-    )
-
-    Surface(
-        shape = CircleShape,
-        color = navContainerColor,
-        shadowElevation = if (isBlurActive) 0.dp else 6.dp,
-        modifier = modifier
-            .hazeEffect(state = hazeState) {
-                this.blurRadius = blurRadius
-                this.blurEnabled = isBlurActive
-                this.inputScale = HazeInputScale.Auto
-                this.tints = listOf(
-                    HazeTint(surfaceContainerColor.copy(alpha = tintAlpha))
-                )
-            }
-            .border(
-                width = 1.dp,
-                brush = edgeLightBrush,
-                shape = CircleShape
-            )
+    NavigationBar(
+        modifier = modifier,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            destinations.forEach { dest ->
-                val selected = currentRoute == dest.route
-                val label = androidx.compose.ui.res.stringResource(dest.labelRes)
-                // Icon pops with an overshoot spring whenever this tab becomes active
-                val pop = remember { Animatable(1f) }
-                LaunchedEffect(selected) {
-                    if (selected) {
-                        pop.snapTo(0.65f)
-                        pop.animateTo(
-                            1f,
-                            spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMedium
-                            )
-                        )
-                    }
+        destinations.forEach { dest ->
+            val selected = currentRoute == dest.route
+            val label = androidx.compose.ui.res.stringResource(dest.labelRes)
+            NavigationBarItem(
+                selected = selected,
+                onClick = { onNavigate(dest.route) },
+                icon = {
+                    Icon(
+                        imageVector = dest.icon,
+                        contentDescription = label
+                    )
+                },
+                label = {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelMedium
+                    )
                 }
-                Surface(
-                    shape = CircleShape,
-                    color = if (selected) MaterialTheme.colorScheme.primaryContainer
-                    else androidx.compose.ui.graphics.Color.Transparent,
-                    modifier = Modifier
-                        .bouncyClickable(scaleDown = 0.88f) { onNavigate(dest.route) }
-                        .clip(CircleShape)
-                        .animateContentSize()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = if (selected) 16.dp else 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            dest.icon,
-                            contentDescription = label,
-                            tint = if (selected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .size(22.dp)
-                                .graphicsLayer {
-                                    scaleX = pop.value
-                                    scaleY = pop.value
-                                }
-                        )
-                        AnimatedVisibility(
-                            visible = selected,
-                            enter = expandHorizontally() + fadeIn(),
-                            exit = shrinkHorizontally() + fadeOut()
-                        ) {
-                            Text(
-                                label,
-                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
-                                color = MaterialTheme.colorScheme.primary,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                }
-            }
+            )
         }
     }
 }

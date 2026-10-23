@@ -61,15 +61,13 @@ fun StatChip(
     label: String,
     tint: Color,
     container: Color,
-    modifier: Modifier = Modifier,
-    hazeState: dev.chrisbanes.haze.HazeState? = null,
-    liquidGlass: Boolean = false
+    modifier: Modifier = Modifier
 ) {
     val chipShape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
     Surface(
-        modifier = modifier.liquidGlassEffect(hazeState, liquidGlass, chipShape),
+        modifier = modifier,
         shape = chipShape,
-        color = liquidGlassContainerColor(liquidGlass, MaterialTheme.colorScheme.surfaceContainer),
+        color = MaterialTheme.colorScheme.surfaceContainer,
         tonalElevation = 0.dp
     ) {
         Column(
